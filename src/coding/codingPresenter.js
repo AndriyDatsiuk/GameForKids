@@ -1,0 +1,514 @@
+import React from 'react';
+import CodingView from './codingView';
+import CommandModel from '../command/commandModel';
+import useModelProperty from '../customHook';
+import { useState, useEffect } from 'react';
+
+
+
+function CodingPresenter(props) {
+
+  const blocks = useModelProperty(props.model, "levelBlocks");
+  const windowVariables = useModelProperty(props.model, "windowVariables");
+  const rocketPosition = useModelProperty(props.model, "rocketPosition");
+  const commands = useModelProperty(props.model, "levelCommands");
+  const checkPoints = useModelProperty(props.model, "checkPoints");
+  const stepsStars = useModelProperty(props.model, "stepsStars");
+  const stars = useModelProperty(props.model, "stars");
+  const level = useModelProperty(props.model, "curentLevel");
+  const levelTitle = useModelProperty(props.model, "levelTitle");
+  const levelIstructions = useModelProperty(props.model, "levelIstructions");
+  const [open, setOpen] = React.useState(false);
+  const [ev, setEv] = React.useState(false);
+  const [bottomStart, setBottomStart] = React.useState(rocketPosition.bottom);
+  const [rightStart, setRightStart] = React.useState(rocketPosition.right);
+  const [repeat, setRepeat] = React.useState(1);
+  const [errorMessage, setErrorMessage] = React.useState(1);
+  
+
+  useEffect(() => {
+    setOpen(false);
+    
+}, [level]);
+
+useEffect(() => {
+  let rocket = document.getElementById("rocket");
+  setBottomStart(props.model.setBottom(rocketPosition.row));
+  setRightStart(props.model.rocketStartPositionRight(rocketPosition.column));
+  setErrorMessage("")
+  rocket.style.bottom = bottomStart + "px";
+  rocket.style.right = rightStart + "px";
+  setEv(false);
+  
+}, [ev]);
+
+
+  let validCheckPoints = [];
+  let itemsInsideFoor = [];
+
+  let pandaCPos = [];
+  let actionSequence = [];
+
+  const heightB = 40; 
+  const [id, setId] = React.useState(1);
+
+
+  function onDragStart(ev, id) {
+    ev.dataTransfer.setData("id", id);
+  }
+
+  function onDragOver(ev) {
+    ev.preventDefault();
+  }
+
+  function onDragOverDelete(ev) {
+    ev.preventDefault();
+  }
+
+  function onDragStartDelete(ev, id) {
+    ev.dataTransfer.setData("id", id);
+    console.log("onDragStartDelete", id)
+  }
+
+  function drawCommands() {
+    let top = 150;
+    commands.sort(function (a, b) { return a.order - b.order }).forEach((cm) => {
+      cm.top = top;
+      top = top + heightB;
+    })
+    return commands;
+  }
+
+
+  function moveOrderUp(index) {
+    commands.sort(function (a, b) { return a.order - b.order }).slice(index - 1)
+      .forEach((cm, i) => {
+        cm.order = cm.order - 1;
+      
+      });
+
+    let cmd = commands;
+
+    props.model.setCommands([...cmd])
+  }
+
+  function moveOrderDown(index) {
+    
+    commands.sort(function (a, b) { return a.order - b.order }).slice(index - 1)
+      .forEach((cm, i) => {
+        cm.order = cm.order + 1;
+      
+      });
+
+    let cmd = commands;
+    props.model.setCommands([...cmd])
+  }
+
+  function onDrop(ev) {
+    setErrorMessage("")
+    let idc = 0, top = 0;
+    console.log("dropY: " + ev.clientY);
+    
+    const dropY = ev.clientY;
+    let bname = ev.dataTransfer.getData("id");
+   
+    let bl = blocks.find(element => element.name === bname);
+    console.log("bkl: " + JSON.stringify(bl));
+    
+    if (bl === null || bl === undefined) {
+      if (bname != 0) {
+      let c1 = commands.find(element => element.id == bname);
+    
+      for (let i = 1; i < commands.length; i++) {
+        if (dropY >= commands[i - 1].top + 20 && dropY <= commands[i].top + 20) {
+        
+          commands[c1.order].order = i - 1;
+         
+          if (c1.top >= commands[i - 1].top) {
+            let j = i - 1;
+            commands.sort(function (a, b) { return a.order - b.order }).slice(i - 1)
+              .forEach((cm) => { cm.order = j++ })
+          } else {
+            let k = 0;
+            commands.sort(function (a, b) { return a.order - b.order }).slice(0, i - 1)
+              .forEach((cm) => { cm.order = k++ })
+          }
+        }
+        }
+      }
+    } else {
+       
+        if(commands.length < 11){
+         
+          let name = bl.name;
+          let category = bl.category;
+          let select = bl.select;
+
+          let index = commands.length;
+  
+          let minDifferenceTop = commands.slice(-1)[0].top;
+
+     
+          if (dropY < minDifferenceTop && dropY > commands[0].top) {
+         
+            for (let i = 1; i < commands.length; i++) {
+              if (dropY >= commands[i - 1].top + heightB / 2 && dropY <= commands[i].top + heightB / 2) {
+                minDifferenceTop = commands[i].top;
+              
+                index = i;
+               
+              }
+            }
+           
+            top = minDifferenceTop;
+           
+            moveOrderDown(index + 1);
+          } else {
+          
+            top = minDifferenceTop + heightB / 2;
+          }
+
+          idc = id;
+          setId(idc += 1);
+         
+          const c = new CommandModel(idc, index, name, category, top, select);
+
+         
+          commands.splice(index, 0, c);
+        } else { 
+    
+          setErrorMessage("Try to solve this challenge with less than 10 commands")
+        }
+    }
+   
+    let cmd = drawCommands();
+    props.model.setCommands([...cmd])
+  }
+
+  function onDropDelete(ev) {
+    setErrorMessage("")
+    let bname = ev.dataTransfer.getData("id");
+
+    let bl = blocks.find(element => element.name === bname);
+    console.log("bkl: " + JSON.stringify(bl));
+   
+    if ((bl === null || bl === undefined) && bname != 0) {
+      let c1 = commands.find(element => element.id == bname);
+
+      const index = commands.indexOf(c1);
+      commands.splice(index, 1);
+      moveOrderUp(index + 1)
+      const cmd = drawCommands();
+
+      props.model.setCommands([...cmd])
+    }
+  }
+
+
+  function insideCommand(c) {
+   
+    let inside = false
+    for (let i = 1; i < c.order; i++) {
+      if (commands[i].name === 'If' || commands[i].name === 'Repeat') {
+        inside = true;
+      }
+      if (commands[i].name === 'End If' || commands[i].name === 'End Repeat') {
+        inside = false;
+      }
+    }
+    if (c.name === 'End If' || c.name === 'End Repeat') {
+      inside = false;
+    }
+    console.log(inside)
+    return inside;
+  }
+
+  function setBgColor(category) {
+   
+    if (category === 'move') {
+      return '#f55688';
+    } else if (category === 'if' || category === 'ifEnd') {
+      return '#FBBB40';
+    } else if (category === 'loop' || category === 'loopEnd') {
+      return '#51ceff';
+    } else {
+      return '#00B695';
+    }
+  }
+
+
+  function setBrColor(category) {
+    
+    if (category === 'move') {
+      return '#e02062';
+    } else if (category === 'if' || category === 'ifEnd') {
+      return '#CF931E';
+    } else if (category === 'loop' || category === 'loopEnd') {
+      return '#5a9cff';
+    } else {
+      return '#0f816c';
+    }
+  }
+
+  function play() {
+  
+    var pos = [rocketPosition.row, rocketPosition.column];
+
+    console.log(" RUN CODE: ")
+    var limits = [5, 5];
+    commands.forEach((cm, i) => {
+      console.log("Action: " + cm.name);
+      switch (cm.name) {
+        case "When play":
+       
+          pandaCPos = [3, 5]; 
+          actionSequence = [];
+          break;
+        case "If":
+          break;
+        case "End If":
+          break;
+        case "Repeat":
+          let endlist = [];
+          let endPos = -1;
+          const repeatTimes = repeat;
+          console.log("repeatTimes:" + repeatTimes);
+          console.log("repeat:" + repeat);
+
+        
+          endPos = getNextEnd(commands, i, "End Repeat");
+        
+
+          if (endPos  <= 0) { 
+            gameEvalution(); 
+            break;
+          }
+
+         
+          for (let j = 0; j < (repeatTimes - 1); j++) {
+            for (let k = i; k < endPos; k++) {
+              console.log("DOING: " + commands[i + 1].name + " for " + k);
+              commandMove(commands[k].name);
+            }
+          }
+          i = i + endPos;
+          break;
+        case "End Repeat":
+          break;
+        case "Give Strawberry":
+          break;
+        case "Give Carrot":
+          break;
+        case "Give Banana":
+          break;
+        default:
+          commandMove(cm.name);
+      }
+      
+
+    });
+
+    gameEvalution();
+
+  }
+
+  function getNextEnd(arr, current, match) {
+    var indexes;
+  
+    return 4;
+  }
+
+
+  function commandMove(direction) {
+    switch (direction) {
+      case "Move Up":
+        pandaCPos = [pandaCPos[0], pandaCPos[1] - 1];
+        actionSequence.push("bottom");
+        break;
+      case "Move Down":
+        pandaCPos = [pandaCPos[0], pandaCPos[1] + 1];
+        actionSequence.push("top");
+        break;
+      case "Move Right":
+        pandaCPos = [pandaCPos[0] + 1, pandaCPos[1]];
+        actionSequence.push("left");
+        break;
+      case "Move Left":
+        pandaCPos = [pandaCPos[0] - 1, pandaCPos[1]];
+        actionSequence.push("right");
+        break;
+    }
+    evaluateCheckpoint();
+  }
+
+  function evaluateCheckpoint() {
+    
+  
+    checkPoints.forEach((currentCP, i) => {
+      
+    console.log("Checkpoint" + currentCP)
+    console.log("Current point " + pandaCPos);
+    if (currentCP[0] == pandaCPos[0] && currentCP[1] == pandaCPos[1]) {
+      console.log("Made it to a checkpoint");
+      validCheckPoints.push("1");
+    } else {
+    
+    }
+  });
+}
+
+  function playAnimation() {
+
+    let id = null;
+    let elem = document.getElementById("rocket");
+    let direction = null;
+    let after, itemListAction = 0, d = 0;
+    const initX = parseInt(rocketPosition.bottom);
+    const initY = parseInt(rocketPosition.right);
+
+    clearInterval(id);
+    id = setInterval(frame, 5);
+    function frame() {
+      if (direction == null && d < actionSequence.length) {
+        itemListAction = actionSequence[d];
+        switch (itemListAction) {
+          case "bottom":
+            direction = parseInt(rocketPosition.bottom);
+            after = parseInt(direction + windowVariables.sqh);
+            break;
+          case "top":
+            direction = parseInt(rocketPosition.bottom);
+            after = parseInt(direction - windowVariables.sqh);
+        
+            break;
+          case "right":
+            direction = parseInt(rocketPosition.right);
+            after = parseInt(direction + windowVariables.sqw);
+            break;
+          case "left":
+            direction = parseInt(rocketPosition.right);
+            after = parseInt(direction - windowVariables.sqw);
+            break;
+          default:
+
+        }
+      } else if (direction === after) {
+
+        d++;
+        direction = null;
+      } else if (direction === null && d == actionSequence.length) {
+        console.log("end of animation");
+ 
+        clearInterval(id);
+
+      } else {
+        itemListAction = actionSequence[d];
+        console.log("Animate : " + itemListAction);
+        switch (itemListAction) {
+          case "bottom":
+            direction++;
+            rocketPosition.bottom = direction;
+            elem.style.bottom = direction + "px";
+            break;
+          case "top":
+            direction--;
+            rocketPosition.bottom = direction;
+            elem.style.bottom = direction + "px";
+            break;
+          case "right":
+            direction++;
+            rocketPosition.right = direction;
+            elem.style.right = direction + "px";
+            break;
+          case "left":
+            direction--;
+            rocketPosition.right = direction;
+            elem.style.right = direction + "px";
+            break;
+          default:
+        }
+      }
+    }
+  }
+
+
+  function gameEvalution() {
+    setEv(true);
+    playAnimation();
+    console.log(checkPoints);
+
+    if (validCheckPoints.length == checkPoints.length) {
+      setOpen(true);
+      rocketPosition.right = rightStart;
+      rocketPosition.bottom = bottomStart;
+ 
+      console.log(stepsStars);
+      switch (commands.length - 1) {
+        case stepsStars[0]:
+          props.model.setStars(3);
+          break;
+        case stepsStars[1]:
+          props.model.setStars(2);
+          break;
+        default:
+          props.model.setStars(1);
+      }
+    } else {
+      console.log("you didn't found all of the checkpoints, sorry, try again");
+      props.model.setStars(0);
+    }
+    setOpen(true);
+    rocketPosition.right = rightStart;
+    rocketPosition.bottom = bottomStart;
+    console.log("stars: " + stars);
+    console.log("open: " + open);
+  }
+
+  function nextLevel() {
+    props.model.setCurentLevel(level + 1);
+  }
+
+  function selectChange(e, category) {
+    let { name, value } = e.target;
+    console.log("name: " + name + "value: " + value);
+    if(category = "loop"){
+      setRepeat(parseInt(value));
+    }
+    console.log("vaklue seklect: " + repeat);
+  }
+
+  function handleClose(value){
+    setOpen(false);
+  };
+
+  return (
+    <CodingView
+      model={props.model}
+      levelTitle={levelTitle}
+      levelIstructions={levelIstructions}
+      blocks={blocks}
+      commands={commands}
+      onDragOverDelete={(e) => onDragOverDelete(e)} 
+      insideCommand={(c) => insideCommand(c)} 
+      setBgColor={(category) => setBgColor(category)} 
+      setBrColor={(category) => setBrColor(category)} 
+      onDrop={(e) => onDrop(e)}
+      onDragOver={(e) => onDragOver(e)}
+      onDropDelete={(e) => onDropDelete(e)}
+      onDragStart={(ev, id) => onDragStart(ev, id)}
+      onDragStartDelete={(ev, id) => onDragStartDelete(ev, id)}
+      myMove={() => play()}
+      handleClose = {handleClose}
+      stepsStars={stepsStars}
+      stars={stars}
+      level={level}
+      open={open}
+      selectChange = {(e) => selectChange(e)}
+      errorMessage = {errorMessage}
+    />
+  );
+
+
+}
+
+export default CodingPresenter;

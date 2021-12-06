@@ -1,6 +1,3 @@
-# GameForKids
-Added a simple game for kids who want to learn the basics of programming
-
 ## Description 
 LearningHowToCode is a web application that teaches the logic of programming to young children
 
@@ -20,3 +17,5 @@ For the developement of the application I used React.js, MaterialUI and CSS.
 
 3. Run the project.:
     `npm start` 
+
+
